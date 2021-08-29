@@ -1,0 +1,29 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Emacs Integration",
+	"Description": "Allows access to source code in Emacs.",
+	"Category": "Programming",
+	"CreatedBy": "Oleksandr Manenko",
+	"CreatedByURL": "https://manenko.com",
+	"DocsURL": "https://gitlab.com/manenko/emacs-sourcecode-access/-/blob/master/README.md",
+	"MarketplaceURL": "",
+	"SupportURL": "https://gitlab.com/manenko/emacs-sourcecode-access/-/issues",
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "EmacsSourceCodeAccess",
+			"Type": "UncookedOnly",
+			"LoadingPhase": "Default",
+			"WhitelistPlatforms": [
+				"Mac",
+				"Linux",
+				"Win64"
+			]
+		}
+	]
+}
