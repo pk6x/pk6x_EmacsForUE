@@ -16,6 +16,18 @@ This is a **work-in-progress** project.
 6. Select 'Emacs' and restart the Editor for the last time.
 7. Done.
 
+### Screenshots
+
+<details><summary>Editor Preferences</summary>
+![Editor Preferences/General/Source Code](PlugInScreenShots/editor-preferences-general-source-code.png "Editor Preferences")
+</details>
+<details><summary>Menu File/Open Emacs</summary>
+![Menu File/Open Emacs](PlugInScreenShots/menu-file-open-in-emacs.png "Menu File/Open Emacs")
+</details>
+<details><summary>Emacs Integration enabled in the Editor Plugins</summary>
+![Emacs Integration enabled in the Editor Plugins](PlugInScreenShots/list-of-plug-ins.png "Emacs Integration enabled in the Editor Plugins")
+</details>
+
 ### Usage
 
 At the moment, I tested the plug-in on macOS only. It has no platform-specific code except of the hardcoded path to the
