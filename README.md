@@ -10,9 +10,9 @@ This is a **work-in-progress** project.
 
 1. Clone the repository to the `Plugins` directory of your Unreal Engine project (create the directory if it does not exist). Make sure you have no Unreal Editor opened.
 2. Open the project in the Unreal Editor.
-3. The Editor will ask you to rebuild your project modules. Allow it to rebuild it.
+3. The Editor will ask you to rebuild your project modules. Agree with the request.
 4. Restart Unreal Editor.
-5. Now the Editor should have 'Emacs' item in the list of the source code editors.
+5. The Editor should have 'Emacs' item in the list of the source code editors now.
 6. Select 'Emacs' and restart the Editor for the last time.
 7. Done.
 
