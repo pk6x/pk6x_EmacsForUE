@@ -22,13 +22,19 @@
 
 #include "Misc/Paths.h"
 
+// TODO List
+// ---------
+// 1. A few Emacs source code acccessors that utilize different project formats:
+//    - Emacs (uproject). This code accessor has no support of any project generators.
+//      It uses an UBT generator that does nothing.
+//    - Emacs (Clang Compilation Database). This code accessor generates compile_commands.json using UBT.
+// 2. A configuration page for the plug-in where a user can setup
+//    - A full path to 'emacs' command.
+//    - A full path to 'emacsclient' command.
+
 #define LOCTEXT_NAMESPACE "EmacsSourceCodeAccessor"
 
 DEFINE_LOG_CATEGORY_STATIC(LogEmacs, Log, All);
-
-// TODO: Make the path to Emacs configurable so that we either can:
-//       - derive path to emacs and emacsclient from it.
-//       - have two options for emacs and emacsclient.
 
 /**
  * Not necessary to call unless you know you're changing the state of any installed compilers.
@@ -66,7 +72,7 @@ FName FEmacsSourceCodeAccessor::GetFName() const
 	// UBT uses this ID to find which project generator to use.
 	// The editor invokes UBT with this ID when a user selects
 	// "Refresh XXX Project".
-	return FName("EmacsSourceCodeAccessor");
+	return FName("UnrealEmacs");
 }
 
 /**
@@ -198,7 +204,6 @@ bool FEmacsSourceCodeAccessor::AddSourceFiles(
 	const TArray<FString> &AbsoluteSourcePaths,
 	const TArray<FString> &AvailableModules)
 {
-	// We do nothing at the moment.
 	return true;
 }
 
@@ -210,6 +215,7 @@ bool FEmacsSourceCodeAccessor::AddSourceFiles(
 bool FEmacsSourceCodeAccessor::SaveAllOpenDocuments() const
 {
 	// TODO: How do we save all project files in Emacs?
+
 	return false;
 }
 
