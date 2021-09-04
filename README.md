@@ -41,7 +41,6 @@ $ bash
 bash-3.2$ source Engine/Build/BatchFiles/Mac/SetupEnvironment.sh 
 bash-3.2$ xbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 bash-3.2$ exit
-$
 ```
 
 ##### Rebuilding UnrealBuildTool on Windows
