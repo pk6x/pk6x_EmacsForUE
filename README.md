@@ -16,6 +16,48 @@ This is a **work-in-progress** project.
 6. Select 'Emacs' and restart the Editor for the last time.
 7. Done.
 
+#### Optional Patch for Unreal Build Tool
+
+This section is for those who use [lsp](https://emacs-lsp.github.io/lsp-mode/), [rtags](https://github.com/Andersbakken/rtags), or any other autocompletion package that requires a Clang compilation database.
+
+You can apply a patch to the UnrealBuildTool source code which generates a Clang compilation database (`compile_commands.json`) in the project root each time Unreal Editor refreshes the project.
+
+1. Download the [patch](Source/UBT/UBT_UnrealEmacs.diff) to the Engine root directory.
+2. Change directory to the Engine root directory.
+3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff`
+4. Rebuild the UnrealBuildTool.
+
+##### Rebuilding UnrealBuildTool on GNU/Linux
+
+```shell
+$ source Engine/Build/BatchFiles/Linux/SetupEnvironment.sh 
+$ xbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
+```
+
+##### Rebuilding UnrealBuildTool on macOS
+
+```shell
+$ bash
+bash-3.2$ source Engine/Build/BatchFiles/Mac/SetupEnvironment.sh 
+bash-3.2$ xbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
+bash-3.2$ exit
+$
+```
+
+##### Rebuilding UnrealBuildTool on Windows
+
+Go to the Start menu and enter "dev" or "developer command prompt".
+This should bring up a list of installed apps that match your search pattern.
+Select "Developer Command Prompt".
+If it is not there, then you can find it manually at `<visualstudio installation folder>\<version>\Common7\Tools\LaunchDevCmd.bat`.
+You also must have the .NET development tools and .NET framework target packs installed.
+
+Issue the following command:
+
+```shell
+msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
+```
+
 ### Screenshots
 
 <details><summary>Editor Preferences</summary>
