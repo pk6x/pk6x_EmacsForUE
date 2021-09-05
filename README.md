@@ -22,10 +22,21 @@ This section is for those who use [lsp](https://emacs-lsp.github.io/lsp-mode/), 
 
 You can apply a patch to the UnrealBuildTool source code which generates a Clang compilation database (`compile_commands.json`) in the project root each time Unreal Editor refreshes the project.
 
+<details><summary>Prerequisites</summary>
+1. You need access to the `patch` command. GNU/Linux and macOS user should have it installed by default. Windows users could use Git Bash or WSL.
+2. You should have Clang installed. 
+2.1. GNU/Linux users should be able to install it via package manager.
+2.2. macOS users should have it already installed.
+2.3. Windows users can download the installer from the LLVM Project [Releases](https://github.com/llvm/llvm-project/releases). Version [12.0.1](https://github.com/llvm/llvm-project/releases/download/llvmorg-12.0.1/LLVM-12.0.1-win64.exe) should do fine. Make sure you install it to the default location (`C:\Program Files\LLVM`) otherwise Unreal Engine will not be able to find it.
+</details>
+
+To apply the patch:
+
 1. Download the [patch](Source/UBT/UBT_UnrealEmacs.diff) to the Engine root directory.
 2. Change directory to the Engine root directory.
-3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff` (use Git Bash or WSL on Windows to get access to `patch` command).
+3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff`.
 4. Rebuild the UnrealBuildTool.
+
 
 ##### Rebuilding UnrealBuildTool on GNU/Linux
 
