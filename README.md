@@ -11,9 +11,9 @@ This is a **work-in-progress** project.
 1. Clone the repository to the `Plugins` directory of your Unreal Engine project (create the directory if it does not exist). Make sure you have no Unreal Editor opened.
 2. Open the project in the Unreal Editor.
 3. The Editor will ask you to rebuild your project modules. Agree with the request.
-4. Restart Unreal Editor.
-5. The Editor should have 'Emacs' item in the list of the source code editors now.
-6. Select 'Emacs' and restart the Editor for the last time.
+4. The Editor should have `Emacs` item in the list of the source code editors.
+5. Select `Emacs`. Optionally, set it as default.
+6. Restart the Editor.
 7. Done.
 
 #### Optional Patch for Unreal Build Tool
@@ -29,12 +29,22 @@ You can apply a patch to the UnrealBuildTool source code which generates a Clang
 
 ##### Rebuilding UnrealBuildTool on GNU/Linux
 
+Make sure the source files are writeable.
+You may need to change access permissions to the Engine root directory and its contents recursively.
+
+Issue the following commands:
+
 ```shell
 $ source Engine/Build/BatchFiles/Linux/SetupEnvironment.sh 
 $ xbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 ```
 
 ##### Rebuilding UnrealBuildTool on macOS
+
+Make sure the source files are writeable.
+You may need to change access permissions to the Engine root directory and its contents recursively.
+
+Issue the following commands:
 
 ```shell
 $ bash
@@ -44,6 +54,9 @@ bash-3.2$ exit
 ```
 
 ##### Rebuilding UnrealBuildTool on Windows
+
+Make sure the source files are writeable. You may need to clear 'Read-only' flag
+on the Engine root directory and its content recursively.
 
 Go to the Start menu and enter "dev" or "developer command prompt".
 This should bring up a list of installed apps that match your search pattern.
@@ -71,18 +84,25 @@ msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 
 ### Usage
 
-At the moment, I tested the plug-in on macOS only. It has no platform-specific code except of the hardcoded path to the
-`emacs` and `emacsclient` commands. I plan making those configurable and also test them on GNU/Linux and Windows.
+In the Unreal Editor:
 
-Meanwhile, you can change the path to these commands directly in the plug-in source code as a workaround if defaults
-don't work for you.
+- Use `File/Open Emacs` to open the project in Emacs.
+- Use `File/New C++ Class...` to create a new C++ class and open its files in Emacs.
+- Use `File/Refresh Emacs Project` to regenerate the Clang compilation database. Use should patch the UnrealBuildTool as described in this document to have access to this feature.
 
-#### Emacs Server
+The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open source code files.
+If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, it starts a server and then open the files.
 
-To have the best experience, start an [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html).
-The plug-in will use `emacsclient` when the server is available and open source code files in the server's frame.
-Otherwise, the plug-in fallbacks to `emacs` and uses a new instance of the Emacs each time Unreal Engine asks it to open
-a source file.
+#### Specifying Emacs Client Location
+
+The plug-in should work without any additional configuration on GNU/Linux, macOS, and Windows.
+By default it searches for Emacs client program in the following locations:
+
+- GNU/Linux: `/usr/local/bin/emacsclient`.
+- macOS: `/usr/local/bin/emacsclient`.
+- Windows: `C:/Program Files/Emacs/x86_64/bin/emacsclientw.exe`.
+
+If you have Emacs installed in a different location, then set `UNREAL_EMACS_EMACSCLIENT_PATH` environment variable to a full path to the Emacs client command.
 
 ## Projectile Unreal
 

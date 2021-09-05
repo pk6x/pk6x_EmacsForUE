@@ -20,21 +20,18 @@
 
 #include "EmacsSourceCodeAccessor.h"
 
+#include "GenericPlatform/GenericPlatformMisc.h"
 #include "Misc/Paths.h"
-
-// TODO List
-// ---------
-// 1. A few Emacs source code acccessors that utilize different project formats:
-//    - Emacs (uproject). This code accessor has no support of any project generators.
-//      It uses an UBT generator that does nothing.
-//    - Emacs (Clang Compilation Database). This code accessor generates compile_commands.json using UBT.
-// 2. A configuration page for the plug-in where a user can setup
-//    - A full path to 'emacs' command.
-//    - A full path to 'emacsclient' command.
+#include "Windows/WindowsPlatformMisc.h"
 
 #define LOCTEXT_NAMESPACE "EmacsSourceCodeAccessor"
 
 DEFINE_LOG_CATEGORY_STATIC(LogEmacs, Log, All);
+
+// How the plug-in searches for 'emacsclient' command
+// --------------------------------------------------
+// 1. If environment variable UNREAL_EMACS_EMACSCLIENT_PATH is set, it uses its value.
+// 2. Otherwise it uses hard-coded default values per platform. Refer to FindEmacsLocation function for details.
 
 /**
  * Not necessary to call unless you know you're changing the state of any installed compilers.
@@ -67,7 +64,7 @@ FName FEmacsSourceCodeAccessor::GetFName() const
 	// config section:
 	//
 	// [/Script/SourceCodeAccess.SourceCodeAccessSettings]
-	// PreferredAccessor=EmacsSourceCodeAccessor
+	// PreferredAccessor=UnrealEmacs
 	//
 	// UBT uses this ID to find which project generator to use.
 	// The editor invokes UBT with this ID when a user selects
@@ -81,7 +78,7 @@ FName FEmacsSourceCodeAccessor::GetFName() const
  */
 FText FEmacsSourceCodeAccessor::GetNameText() const
 {
-	//  This is the name shown in the dropdown list of source code editors in the Editor.
+	// This is the name shown in the dropdown list of source code editors in the Editor.
 	return LOCTEXT("EmacsDisplayName", "Emacs");
 }
 
@@ -116,7 +113,7 @@ bool FEmacsSourceCodeAccessor::OpenSolution()
  */
 bool FEmacsSourceCodeAccessor::OpenSolutionAtPath(const FString &InSolutionPath)
 {
-	// TODO: Make sure InSolutionPath is correct path to a uproject file.
+	// TODO: Make sure InSolutionPath is a correct path to a uproject file.
 	FProcHandle EmacsProcess = RunEmacs(*ShellQuoteArgument(InSolutionPath));
 	if (!EmacsProcess.IsValid()) {
 		UE_LOG(LogEmacs, Warning, TEXT("Failed to open solution '%s'"), *InSolutionPath);
@@ -214,7 +211,7 @@ bool FEmacsSourceCodeAccessor::AddSourceFiles(
  */
 bool FEmacsSourceCodeAccessor::SaveAllOpenDocuments() const
 {
-	// TODO: How do we save all project files in Emacs?
+	// TODO: How do we send a command to save all project files in Emacs?
 
 	return false;
 }
@@ -229,14 +226,24 @@ void FEmacsSourceCodeAccessor::Tick(const float DeltaTime)
 
 FString FEmacsSourceCodeAccessor::FindEmacsLocation() const
 {
-	// For now we require emacsclient to be in the PATH
+	FString UserDefinedEmacsLocation = FPlatformMisc::GetEnvironmentVariable(TEXT("UNREAL_EMACS_EMACSCLIENT_PATH"));
+	if (!UserDefinedEmacsLocation.IsEmpty()) {
+		return UserDefinedEmacsLocation;
+	}
+
+#if PLATFORM_MAC || PLATFORM_LINUX
 	return TEXT("/usr/local/bin/emacsclient");
+#elif PLATFORM_WINDOWS
+	return TEXT("C:/Program Files/Emacs/x86_64/bin/emacsclientw.exe");
+#else
+	return TEXT("");
+#endif
 }
 
 FProcHandle FEmacsSourceCodeAccessor::RunEmacs(const FString &Arguments) const
 {
 	// Open Emacs if there is no Emacs Server running, otherwise reuse existing frame
-	FString FinalArguments = TEXT("-a=/usr/local/bin/emacs -n ");
+	FString FinalArguments = TEXT("--no-wait --alternate-editor= ");
 	FinalArguments.Append(Arguments);
 	FinalArguments.TrimStartAndEndInline();
 
