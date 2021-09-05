@@ -6,7 +6,11 @@
 
 This is a **work-in-progress** project.
 
-### Installation
+[[_TOC_]]
+
+## Installation
+
+### Installing the Plug-in
 
 1. Clone the repository to the `Plugins` directory of your Unreal Engine project (create the directory if it does not exist). Make sure you have no Unreal Editor opened.
 2. Open the project in the Unreal Editor.
@@ -16,7 +20,7 @@ This is a **work-in-progress** project.
 6. Restart the Editor.
 7. Done.
 
-#### Optional Patch for Unreal Build Tool
+### Optional Patch for Unreal Build Tool
 
 This section is for those who use [lsp](https://emacs-lsp.github.io/lsp-mode/), [rtags](https://github.com/Andersbakken/rtags), or any other autocompletion package that requires a Clang compilation database.
 
@@ -43,7 +47,6 @@ Windows users can download the installer from the LLVM Project [Releases](https:
 2. Change directory to the Engine root directory.
 3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff`.
 4. Rebuild the UnrealBuildTool.
-
 
 #### Rebuilding UnrealBuildTool on GNU/Linux
 
@@ -88,7 +91,7 @@ Issue the following command:
 msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 ```
 
-### Screenshots
+## Screenshots
 
 <details><summary>Editor Preferences</summary>
 ![Editor Preferences/General/Source Code](PlugInScreenShots/editor-preferences-general-source-code.png "Editor Preferences")
@@ -100,7 +103,7 @@ msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 ![Emacs Integration enabled in the Editor Plugins](PlugInScreenShots/list-of-plug-ins.png "Emacs Integration enabled in the Editor Plugins")
 </details>
 
-### Usage
+## Usage
 
 In the Unreal Editor:
 
@@ -111,7 +114,7 @@ In the Unreal Editor:
 The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open source code files.
 If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, it starts a server and then open the files.
 
-#### Specifying Emacs Client Location
+### Specifying Emacs Client Location
 
 The plug-in should work without any additional configuration on GNU/Linux, macOS, and Windows.
 By default it searches for Emacs client program in the following locations:
