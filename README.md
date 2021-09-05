@@ -4,8 +4,6 @@
 
 **Emacs Source Code Accessor** is a plug-in for Unreal Editor that adds Emacs to the list of source code editors.
 
-This is a **work-in-progress** project.
-
 [[_TOC_]]
 
 ## Installation
