@@ -24,7 +24,7 @@ You can apply a patch to the UnrealBuildTool source code which generates a Clang
 
 1. Download the [patch](Source/UBT/UBT_UnrealEmacs.diff) to the Engine root directory.
 2. Change directory to the Engine root directory.
-3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff`
+3. Apply the patch: `patch -p1 < UBT_UnrealEmacs.diff` (use Git Bash or WSL on Windows to get access to `patch` command).
 4. Rebuild the UnrealBuildTool.
 
 ##### Rebuilding UnrealBuildTool on GNU/Linux
