@@ -28,8 +28,8 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogEmacs, Log, All);
 
-// How the plug-in searches for 'emacsclient' command
-// --------------------------------------------------
+// How the plug-in searches for Emacs executables
+// ----------------------------------------------
 // 1. If environment variable UNREAL_EMACS_EMACSDIR is set, it uses its value as a directory where Emacs client and
 //    Emacs executable could be found.
 // 2. Otherwise it uses hard-coded default values per platform. Refer to FindEmacsDirectory function for details.
@@ -58,6 +58,9 @@ void FEmacsSourceCodeAccessor::RefreshAvailability()
 #elif PLATFORM_WINDOWS
 	EmacsLocation       = FPaths::Combine(EmacsDirectory, TEXT("runemacs.exe"));
 	EmacsClientLocation = FPaths::Combine(EmacsDirectory, TEXT("emacsclientw.exe"));
+
+	EmacsLocation.ReplaceInline(TEXT("/"), TEXT("\\"));
+	EmacsClientLocation.ReplaceInline(TEXT("/"), TEXT("\\"));
 #endif
 	bHasEmacsInstalled = FPaths::FileExists(EmacsLocation) && FPaths::FileExists(EmacsClientLocation);
 }
@@ -260,12 +263,16 @@ FString FEmacsSourceCodeAccessor::FindEmacsDirectory() const
 
 FProcHandle FEmacsSourceCodeAccessor::RunEmacs(const FString &Arguments) const
 {
-	// Open Emacs if there is no Emacs Server running, otherwise reuse existing frame
+#if PLATFORM_WINDOWS
+	// On Windows emacsclient(-w) fails if path to the alternate editor has spaces even if the path is quoted.
+	FString FinalArguments = TEXT("-q -n --alternate-editor= ");
+#else
 	FString FinalArguments = FString::Printf(TEXT("-q -n -a %s "), *ShellQuoteArgument(EmacsLocation));
+#endif
 	FinalArguments.Append(Arguments);
 	FinalArguments.TrimStartAndEndInline();
 
-	UE_LOG(LogEmacs, Warning, TEXT("Running Emacs with args '%s'"), *FinalArguments);
+	// UE_LOG(LogEmacs, Warning, TEXT("Running Emacs with args '%s'"), *FinalArguments);
 
 	return FPlatformProcess::CreateProc(
 		*EmacsClientLocation,
@@ -292,7 +299,7 @@ FString FEmacsSourceCodeAccessor::EvalEmacsCommand(const FString &Lisp) const
 	StdOut.TrimStartAndEndInline();
 	StdErr.TrimStartAndEndInline();
 
-	UE_LOG(LogEmacs, Warning, TEXT("Emacs command '%s' result:\n'%s'\n'%s'"), *Lisp, *StdOut, *StdErr);
+	// UE_LOG(LogEmacs, Warning, TEXT("Emacs command '%s' result:\n'%s'\n'%s'"), *Lisp, *StdOut, *StdErr);
 
 	return StdOut;
 }
