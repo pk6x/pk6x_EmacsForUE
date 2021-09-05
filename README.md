@@ -115,13 +115,13 @@ If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_nod
 ### Specifying Emacs Client Location
 
 The plug-in should work without any additional configuration on GNU/Linux, macOS, and Windows.
-By default it searches for Emacs client program in the following locations:
+By default it searches for Emacs binary directory in the following locations:
 
-- GNU/Linux: `/usr/local/bin/emacsclient`.
-- macOS: `/usr/local/bin/emacsclient`.
-- Windows: `C:/Program Files/Emacs/x86_64/bin/emacsclientw.exe`.
+- GNU/Linux: `/usr/local/bin`.
+- macOS: `/usr/local/bin`.
+- Windows: `C:/Program Files/Emacs/x86_64/bin`.
 
-If you have Emacs installed in a different location, then set `UNREAL_EMACS_EMACSCLIENT_PATH` environment variable to a full path to the Emacs client command.
+If you have Emacs installed in a different location, then set `UNREAL_EMACS_EMACSDIR` environment variable to a full path to the Emacs binary directory.
 
 ## Projectile Unreal
 

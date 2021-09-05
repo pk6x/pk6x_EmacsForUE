@@ -115,8 +115,9 @@ public:
 	virtual void Tick(const float DeltaTime) override;
 
 private:
-	FString     FindEmacsLocation() const;
-	FProcHandle RunEmacs(const FString& Arguments) const;
+	FString     FindEmacsDirectory() const;
+	FProcHandle RunEmacs(const FString &Arguments) const;
+	FString     EvalEmacsCommand(const FString &Lisp) const;
 
 	FORCEINLINE FString ShellQuoteArgument(const FString &Argument) const
 	{
@@ -125,4 +126,5 @@ private:
 
 	bool    bHasEmacsInstalled = false;
 	FString EmacsLocation;
+	FString EmacsClientLocation;
 };

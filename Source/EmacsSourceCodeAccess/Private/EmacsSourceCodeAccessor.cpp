@@ -21,8 +21,8 @@
 #include "EmacsSourceCodeAccessor.h"
 
 #include "GenericPlatform/GenericPlatformMisc.h"
+#include "Misc/CString.h"
 #include "Misc/Paths.h"
-#include "Windows/WindowsPlatformMisc.h"
 
 #define LOCTEXT_NAMESPACE "EmacsSourceCodeAccessor"
 
@@ -30,8 +30,11 @@ DEFINE_LOG_CATEGORY_STATIC(LogEmacs, Log, All);
 
 // How the plug-in searches for 'emacsclient' command
 // --------------------------------------------------
-// 1. If environment variable UNREAL_EMACS_EMACSCLIENT_PATH is set, it uses its value.
-// 2. Otherwise it uses hard-coded default values per platform. Refer to FindEmacsLocation function for details.
+// 1. If environment variable UNREAL_EMACS_EMACSDIR is set, it uses its value as a directory where Emacs client and
+//    Emacs executable could be found.
+// 2. Otherwise it uses hard-coded default values per platform. Refer to FindEmacsDirectory function for details.
+// 3. For GNU/Linux and macOS it then looks for "emacsclient" and "emacs" programs in that folder. For Windows it looks
+//    for "emacsclientw" and "runemacs".
 
 /**
  * Not necessary to call unless you know you're changing the state of any installed compilers.
@@ -40,8 +43,23 @@ DEFINE_LOG_CATEGORY_STATIC(LogEmacs, Log, All);
  */
 void FEmacsSourceCodeAccessor::RefreshAvailability()
 {
-	EmacsLocation      = FindEmacsLocation();
-	bHasEmacsInstalled = !EmacsLocation.IsEmpty() && FPaths::FileExists(EmacsLocation);
+	FString EmacsDirectory = FindEmacsDirectory();
+	FPaths::NormalizeDirectoryName(EmacsDirectory);
+	if (EmacsDirectory.IsEmpty() || !FPaths::DirectoryExists(EmacsDirectory)) {
+		bHasEmacsInstalled  = false;
+		EmacsLocation       = TEXT("");
+		EmacsClientLocation = TEXT("");
+		return;
+	}
+
+#if PLATFORM_LINUX || PLATFORM_MAC
+	EmacsLocation       = FPaths::Combine(EmacsDirectory, TEXT("emacs"));
+	EmacsClientLocation = FPaths::Combine(EmacsDirectory, TEXT("emacsclient"));
+#elif PLATFORM_WINDOWS
+	EmacsLocation       = FPaths::Combine(EmacsDirectory, TEXT("runemacs.exe"));
+	EmacsClientLocation = FPaths::Combine(EmacsDirectory, TEXT("emacsclientw.exe"));
+#endif
+	bHasEmacsInstalled = FPaths::FileExists(EmacsLocation) && FPaths::FileExists(EmacsClientLocation);
 }
 
 /**
@@ -224,17 +242,17 @@ void FEmacsSourceCodeAccessor::Tick(const float DeltaTime)
 {
 }
 
-FString FEmacsSourceCodeAccessor::FindEmacsLocation() const
+FString FEmacsSourceCodeAccessor::FindEmacsDirectory() const
 {
-	FString UserDefinedEmacsLocation = FPlatformMisc::GetEnvironmentVariable(TEXT("UNREAL_EMACS_EMACSCLIENT_PATH"));
+	FString UserDefinedEmacsLocation = FPlatformMisc::GetEnvironmentVariable(TEXT("UNREAL_EMACS_EMACSDIR"));
 	if (!UserDefinedEmacsLocation.IsEmpty()) {
 		return UserDefinedEmacsLocation;
 	}
 
 #if PLATFORM_MAC || PLATFORM_LINUX
-	return TEXT("/usr/local/bin/emacsclient");
+	return TEXT("/usr/local/bin");
 #elif PLATFORM_WINDOWS
-	return TEXT("C:/Program Files/Emacs/x86_64/bin/emacsclientw.exe");
+	return TEXT("C:/Program Files/Emacs/x86_64/bin");
 #else
 	return TEXT("");
 #endif
@@ -243,12 +261,14 @@ FString FEmacsSourceCodeAccessor::FindEmacsLocation() const
 FProcHandle FEmacsSourceCodeAccessor::RunEmacs(const FString &Arguments) const
 {
 	// Open Emacs if there is no Emacs Server running, otherwise reuse existing frame
-	FString FinalArguments = TEXT("--no-wait --alternate-editor= ");
+	FString FinalArguments = FString::Printf(TEXT("-q -n -a %s "), *ShellQuoteArgument(EmacsLocation));
 	FinalArguments.Append(Arguments);
 	FinalArguments.TrimStartAndEndInline();
 
+	UE_LOG(LogEmacs, Warning, TEXT("Running Emacs with args '%s'"), *FinalArguments);
+
 	return FPlatformProcess::CreateProc(
-		*EmacsLocation,
+		*EmacsClientLocation,
 		*FinalArguments,
 		true,
 		false,
@@ -257,6 +277,24 @@ FProcHandle FEmacsSourceCodeAccessor::RunEmacs(const FString &Arguments) const
 		0,
 		nullptr,
 		nullptr);
+}
+
+FString FEmacsSourceCodeAccessor::EvalEmacsCommand(const FString &Lisp) const
+{
+	FString FinalArguments = TEXT("--no-wait --eval ");
+	FinalArguments.Append(ShellQuoteArgument(Lisp));
+	FinalArguments.TrimStartAndEndInline();
+
+	FString StdOut;
+	FString StdErr;
+	FPlatformProcess::ExecProcess(*EmacsClientLocation, *FinalArguments, nullptr, &StdOut, &StdErr);
+
+	StdOut.TrimStartAndEndInline();
+	StdErr.TrimStartAndEndInline();
+
+	UE_LOG(LogEmacs, Warning, TEXT("Emacs command '%s' result:\n'%s'\n'%s'"), *Lisp, *StdOut, *StdErr);
+
+	return StdOut;
 }
 
 #undef LOCTEXT_NAMESPACE
