@@ -63,8 +63,8 @@ namespace UnrealBuildTool
 		/// Creates a new instance of the Unreal Emacs project generator.
 		/// </summary>
 		/// <param name="InOnlyGameProject">The project file passed in on the command line.</param>
-		/// <param name="InArguments">T
-		/// he command line arguments used to customize default behavior of the generator.
+		/// <param name="InArguments">
+		/// The command line arguments used to customize default behavior of the generator.
 		/// </param>
 		public UnrealEmacsProjectFileGenerator(FileReference InOnlyGameProject,
 			CommandLineArguments InArguments) : base(InOnlyGameProject)
@@ -126,24 +126,9 @@ namespace UnrealBuildTool
 			// The directory is unused for now but in the future it will contain project specific data
 			// so that Emacs code can use it.
 			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
-
-			FileReference CompilationDatabasePath =
-				FileReference.Combine(MasterProjectPath, "compile_commands.json");
-			using (JsonWriter Writer = new JsonWriter(CompilationDatabasePath, JsonWriterStyle.Compact))
-			{
-				Writer.WriteArrayStart();
-				foreach (KeyValuePair<FileReference, string> FileCommandPair in FileToCompileCommand
-					.OrderBy(x => x.Key.FullName))
-				{
-					Writer.WriteObjectStart();
-					Writer.WriteValue("file", FileCommandPair.Key.FullName);
-					Writer.WriteValue("command", FileCommandPair.Value);
-					Writer.WriteValue("directory", EngineRootDirectory.FullName);
-					Writer.WriteObjectEnd();
-				}
-
-				Writer.WriteArrayEnd();
-			}
+			FileReference CompilationDatabasePath = FileReference.Combine(MasterProjectPath,
+				"compile_commands.json");
+			WriteCompilationDatabase(CompilationDatabasePath, FileToCompileCommand);
 
 			return true;
 		}
@@ -163,57 +148,110 @@ namespace UnrealBuildTool
 
 			foreach (UEBuildBinary Binary in Target.Binaries)
 			{
-				CppCompileEnvironment BinaryCompileEnvironment =
-					Binary.CreateBinaryCompileEnvironment(GlobalCompileEnvironment);
-				foreach (UEBuildModuleCPP Module in Binary.Modules.OfType<UEBuildModuleCPP>())
-				{
-					CppCompileEnvironment ModuleCompileEnvironment =
-						Module.CreateModuleCompileEnvironment(Target.Rules,
-							BinaryCompileEnvironment);
-
-					StringBuilder CompileCommand =
-						new StringBuilder($"\"{ClangCompilerPath.FullName}\" ");
-					foreach (FileItem File in ModuleCompileEnvironment.ForceIncludeFiles)
-					{
-						CompileCommand.AppendFormat(" -include \"{0}\"", File.FullName);
-					}
-
-					foreach (string Definition in ModuleCompileEnvironment.Definitions)
-					{
-						CompileCommand.AppendFormat(" -D\"{0}\"", Definition);
-					}
-
-					foreach (DirectoryReference Path in ModuleCompileEnvironment.UserIncludePaths)
-					{
-						CompileCommand.AppendFormat(" -I\"{0}\"", Path);
-					}
-
-					foreach (DirectoryReference Path in ModuleCompileEnvironment.SystemIncludePaths)
-					{
-						CompileCommand.AppendFormat(" -I\"{0}\"", Path);
-					}
-
-					Dictionary<DirectoryItem, FileItem[]> DirectoryToSourceFile =
-						new Dictionary<DirectoryItem, FileItem[]>();
-					UEBuildModuleCPP.InputFileCollection InputFiles = Module.FindInputFiles(
-						Target.Platform, DirectoryToSourceFile);
-
-					List<FileItem> SourceFiles = new List<FileItem>();
-					SourceFiles.AddRange(InputFiles.CPPFiles);
-					SourceFiles.AddRange(InputFiles.CCFiles);
-
-					foreach (FileItem File in SourceFiles)
-					{
-						FileToCompileCommand[File.Location] =
-							$"{CompileCommand} \"{File.FullName}\"";
-					}
-				}
+				GenerateCompileCommandsForBinary(Binary, Target, GlobalCompileEnvironment,
+					ClangCompilerPath);
 			}
 		}
 
 		#endregion
 
-		#region Utilities
+		#region Methods
+
+		/// <summary>
+		/// Writes Clang compilation database to the file under the given path. 
+		/// </summary>
+		/// <param name="CompilationDatabasePath">Path to the 'compile_commands.json' file.</param>
+		/// <param name="FileToCompileCommand">
+		/// An enumerable collection of File->CompilationCommand pairs.
+		/// </param>
+		private void WriteCompilationDatabase(FileReference CompilationDatabasePath,
+			IEnumerable<KeyValuePair<FileReference, string>> FileToCompileCommand)
+		{
+			using (JsonWriter Writer = new JsonWriter(CompilationDatabasePath, JsonWriterStyle.Compact))
+			{
+				Writer.WriteArrayStart();
+				foreach (KeyValuePair<FileReference, string> FileCommandPair in FileToCompileCommand
+					.OrderBy(x => x.Key.FullName))
+				{
+					Writer.WriteObjectStart();
+					Writer.WriteValue("file", FileCommandPair.Key.FullName);
+					Writer.WriteValue("command", FileCommandPair.Value);
+					Writer.WriteValue("directory", EngineRootDirectory.FullName);
+					Writer.WriteObjectEnd();
+				}
+
+				Writer.WriteArrayEnd();
+			}
+		}
+
+		/// <summary>
+		/// Generates Clang compile commands for the given binary and adds them to
+		/// the <see cref="FileToCompileCommand"/> dictionary.
+		/// </summary>
+		/// <param name="Binary">A binary to generate compile commands for.</param>
+		/// <param name="Target">The <see cref="Binary"/>'s target.</param>
+		/// <param name="GlobalCompileEnvironment">The global compile environment to copy settings from.</param>
+		/// <param name="ClangCompilerPath">The path to the clang++ executable.</param>
+		private void GenerateCompileCommandsForBinary(UEBuildBinary Binary, UEBuildTarget Target,
+			CppCompileEnvironment GlobalCompileEnvironment, FileReference ClangCompilerPath)
+		{
+			CppCompileEnvironment BinaryCompileEnvironment = Binary.CreateBinaryCompileEnvironment(
+				GlobalCompileEnvironment);
+			foreach (UEBuildModuleCPP Module in Binary.Modules.OfType<UEBuildModuleCPP>())
+			{
+				GenerateCompileCommandsForModule(Module, Target.Rules, BinaryCompileEnvironment,
+					ClangCompilerPath);
+			}
+		}
+
+		/// <summary>
+		/// Generates Clang compile commands for the given C++ module and adds them to
+		/// the <see cref="FileToCompileCommand"/> dictionary.
+		/// </summary>
+		/// <param name="Module">The C++ module to generate compile commands for.</param>
+		/// <param name="TargetRules">The target rules to configure the module's compile environment.</param>
+		/// <param name="BinaryCompileEnvironment">The compile environment to copy settings from.</param>
+		/// <param name="ClangCompilerPath">The path to the clang++ executable.</param>
+		private void GenerateCompileCommandsForModule(UEBuildModuleCPP Module, ReadOnlyTargetRules TargetRules,
+			CppCompileEnvironment BinaryCompileEnvironment, FileReference ClangCompilerPath)
+		{
+			CppCompileEnvironment ModuleCompileEnvironment = Module.CreateModuleCompileEnvironment(
+				TargetRules, BinaryCompileEnvironment);
+
+			StringBuilder CompileCommand = new StringBuilder($"\"{ClangCompilerPath.FullName}\" ");
+			foreach (FileItem File in ModuleCompileEnvironment.ForceIncludeFiles)
+			{
+				CompileCommand.AppendFormat(" -include \"{0}\"", File.FullName);
+			}
+
+			foreach (string Definition in ModuleCompileEnvironment.Definitions)
+			{
+				CompileCommand.AppendFormat(" -D\"{0}\"", Definition);
+			}
+
+			foreach (DirectoryReference Path in ModuleCompileEnvironment.UserIncludePaths)
+			{
+				CompileCommand.AppendFormat(" -I\"{0}\"", Path);
+			}
+
+			foreach (DirectoryReference Path in ModuleCompileEnvironment.SystemIncludePaths)
+			{
+				CompileCommand.AppendFormat(" -I\"{0}\"", Path);
+			}
+
+
+			UEBuildModuleCPP.InputFileCollection InputFiles = Module.FindInputFiles(
+				TargetRules.Platform, new Dictionary<DirectoryItem, FileItem[]>());
+
+			List<FileItem> SourceFiles = new List<FileItem>();
+			SourceFiles.AddRange(InputFiles.CPPFiles);
+			SourceFiles.AddRange(InputFiles.CCFiles);
+
+			foreach (FileItem File in SourceFiles)
+			{
+				FileToCompileCommand[File.Location] = $"{CompileCommand} \"{File.FullName}\"";
+			}
+		}
 
 		/// <summary>
 		/// Searches for the Clang compiler for the given platform.
