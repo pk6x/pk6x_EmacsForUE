@@ -110,8 +110,19 @@ In the Unreal Editor you can:
 - Use menu item `File/Refresh Emacs Project` to regenerate the Clang compilation database. Use should patch the UnrealBuildTool as described in this document to have access to this feature.
 - Right click on a C++ class in the Unreal Editor, choose `Create C++ class dirived from CLASSNAME` menu item to create a new class and open its files in Emacs.
 
-The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open source code files.
-If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, it starts a server and then open the files.
+### Emacs Server
+
+The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open a project's source code files.
+
+If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, the
+plug-in opens a new Emacs frame (a GUI window) each time it is asked to open a file. 
+If you don't like this behavior, make sure you have a server running.
+The easiest way to achieve is by adding the following lines to your Emacs `init.el`:
+
+```elisp
+(when (not (server-running-p))
+  (server-start))
+```
 
 ### Specifying Emacs Binary Directory Location
 
