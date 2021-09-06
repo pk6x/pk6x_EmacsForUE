@@ -14,7 +14,7 @@
 2. Open the project in the Unreal Editor.
 3. The Editor will ask you to rebuild your project modules. Agree with the request.
 4. The Editor should have `Emacs` item in the list of the source code editors.
-5. Select `Emacs`. Optionally, set it as default.
+5. Select `Emacs`. Optionally, set it as a default source code accessor.
 6. Restart the Editor.
 7. Done.
 
@@ -29,7 +29,7 @@ You can apply a patch to the UnrealBuildTool source code which generates a Clang
 ##### Patch Command Line Utility
 
 You need access to the `patch` command. 
-GNU/Linux and macOS user should have it installed by default. 
+GNU/Linux and macOS users should have it installed by default. 
 Windows users could use Git Bash or WSL.
 
 ##### Clang Compiler
@@ -103,16 +103,17 @@ msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 
 ## Usage
 
-In the Unreal Editor:
+In the Unreal Editor you can:
 
-- Use `File/Open Emacs` to open the project in Emacs.
-- Use `File/New C++ Class...` to create a new C++ class and open its files in Emacs.
-- Use `File/Refresh Emacs Project` to regenerate the Clang compilation database. Use should patch the UnrealBuildTool as described in this document to have access to this feature.
+- Use menu item `File/Open Emacs` to open the project in Emacs.
+- Use menu item `File/New C++ Class...` to create a new C++ class and open its files in Emacs.
+- Use menu item `File/Refresh Emacs Project` to regenerate the Clang compilation database. Use should patch the UnrealBuildTool as described in this document to have access to this feature.
+- Right click on a C++ class in the Unreal Editor, choose `Create C++ class dirived from CLASSNAME` menu item to create a new class and open its files in Emacs.
 
 The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open source code files.
 If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, it starts a server and then open the files.
 
-### Specifying Emacs Client Location
+### Specifying Emacs Binary Directory Location
 
 The plug-in should work without any additional configuration on GNU/Linux, macOS, and Windows.
 By default it searches for Emacs binary directory in the following locations:
@@ -122,6 +123,8 @@ By default it searches for Emacs binary directory in the following locations:
 - Windows: `C:/Program Files/Emacs/x86_64/bin`.
 
 If you have Emacs installed in a different location, then set `UNREAL_EMACS_EMACSDIR` environment variable to a full path to the Emacs binary directory.
+
+The plug-in uses `UNREAL_EMACS_EMACSDIR/emacsclient` and `UNREAL_EMACS_EMACSDIR/emacs` on GNU/Linux and macOS; and `UNREAL_EMACS_EMACSDIR/emacsclientw.exe` and `UNREAL_EMACS_EMACSDIR/runemacs.exe` on Windows.
 
 ## Projectile Unreal
 
