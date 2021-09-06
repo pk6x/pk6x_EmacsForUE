@@ -117,7 +117,7 @@ public:
 private:
 	FString     FindEmacsDirectory() const;
 	FProcHandle RunEmacs(const FString &Arguments) const;
-	FString     EvalEmacsCommand(const FString &Lisp) const;
+	bool        EvalEmacsCommand(const FString &Lisp, FString &Response) const;
 
 	FORCEINLINE FString ShellQuoteArgument(const FString &Argument) const
 	{

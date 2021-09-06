@@ -232,9 +232,24 @@ bool FEmacsSourceCodeAccessor::AddSourceFiles(
  */
 bool FEmacsSourceCodeAccessor::SaveAllOpenDocuments() const
 {
-	// TODO: How do we send a command to save all project files in Emacs?
+	// TODO: Not sure when this is called.
+	bool bStatus = false;
+	/*
+	        // The command returns:
+	        // - "[$PROJECT_NAME] Saved $N buffers"
+	        // - "[$PROJECT_NAME] No buffers need saving"
+	        const FString SaveAllProjectBuffersCommand = TEXT("(projectile-save-project-buffers)");
 
-	return false;
+	        UE_LOG(LogEmacs, Warning, TEXT("Asked to save all open documents."));
+
+	        FString Response;
+	        bStatus = EvalEmacsCommand(SaveAllProjectBuffersCommand, Response);
+
+	        UE_LOG(LogEmacs, Warning, TEXT("Sent command to Emacs. The status is: %d. Response is '%s'"), bStatus,
+	   *Response);
+	*/
+
+	return bStatus;
 }
 
 /**
@@ -286,7 +301,7 @@ FProcHandle FEmacsSourceCodeAccessor::RunEmacs(const FString &Arguments) const
 		nullptr);
 }
 
-FString FEmacsSourceCodeAccessor::EvalEmacsCommand(const FString &Lisp) const
+bool FEmacsSourceCodeAccessor::EvalEmacsCommand(const FString &Lisp, FString &Response) const
 {
 	FString FinalArguments = TEXT("--no-wait --eval ");
 	FinalArguments.Append(ShellQuoteArgument(Lisp));
@@ -294,14 +309,15 @@ FString FEmacsSourceCodeAccessor::EvalEmacsCommand(const FString &Lisp) const
 
 	FString StdOut;
 	FString StdErr;
-	FPlatformProcess::ExecProcess(*EmacsClientLocation, *FinalArguments, nullptr, &StdOut, &StdErr);
+	bool bStatus = FPlatformProcess::ExecProcess(*EmacsClientLocation, *FinalArguments, nullptr, &StdOut, &StdErr);
 
 	StdOut.TrimStartAndEndInline();
 	StdErr.TrimStartAndEndInline();
 
 	// UE_LOG(LogEmacs, Warning, TEXT("Emacs command '%s' result:\n'%s'\n'%s'"), *Lisp, *StdOut, *StdErr);
+	Response = StdOut;
 
-	return StdOut;
+	return bStatus;
 }
 
 #undef LOCTEXT_NAMESPACE

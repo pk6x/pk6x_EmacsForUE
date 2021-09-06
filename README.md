@@ -120,6 +120,7 @@ If you don't like this behavior, make sure you have a server running.
 The easiest way to achieve is by adding the following lines to your Emacs `init.el`:
 
 ```elisp
+(require 'server)
 (when (not (server-running-p))
   (server-start))
 ```
