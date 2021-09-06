@@ -101,6 +101,10 @@ msbuild Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 ![Emacs Integration enabled in the Editor Plugins](PlugInScreenShots/list-of-plug-ins.png "Emacs Integration enabled in the Editor Plugins")
 </details>
 
+## Video
+
+You can watch the plug-in in action on [YouTube](https://www.youtube.com/watch?v=x73daC58qQc).
+
 ## Usage
 
 In the Unreal Editor you can:
