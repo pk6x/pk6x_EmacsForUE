@@ -121,7 +121,7 @@ The plug-in uses `emacsclient` (`emacsclientw` on Windows) to open a project's s
 If there is no [Emacs server](https://www.gnu.org/software/emacs/manual/html_node/emacs/Emacs-Server.html) running, the
 plug-in opens a new Emacs frame (a GUI window) each time it is asked to open a file. 
 If you don't like this behavior, make sure you have a server running.
-The easiest way to achieve is by adding the following lines to your Emacs `init.el`:
+The easiest way to achieve this is by adding the following lines to your Emacs `init.el`:
 
 ```elisp
 (require 'server)
