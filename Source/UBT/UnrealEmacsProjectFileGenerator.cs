@@ -25,6 +25,9 @@ using Tools.DotNETCommon;
 
 namespace UnrealBuildTool
 {
+	/// <summary>
+	/// Generator of Unreal Emacs project files.
+	/// </summary>
 	internal class UnrealEmacsProjectFileGenerator : ProjectFileGenerator
 	{
 		#region Fields and properties
@@ -121,14 +124,22 @@ namespace UnrealBuildTool
 			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
-			EmacsProjectDirectory = DirectoryReference.Combine(MasterProjectPath, ProjectFileExtension);
+			EmacsProjectDirectory = MasterProjectPath;
 
 			// The directory is unused for now but in the future it will contain project specific data
 			// so that Emacs code can use it.
 			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
+
+			// Write Clang compilation database to the project root so that it could be used by autocomplete
+			// backends.
 			FileReference CompilationDatabasePath = FileReference.Combine(MasterProjectPath,
 				"compile_commands.json");
 			WriteCompilationDatabase(CompilationDatabasePath, FileToCompileCommand);
+
+			// Write project file
+			FileReference EmacsProjectPath = FileReference.Combine(EmacsProjectDirectory,
+				ProjectFileExtension);
+			WriteEmacsProject(EmacsProjectPath);
 
 			return true;
 		}
@@ -156,6 +167,29 @@ namespace UnrealBuildTool
 		#endregion
 
 		#region Methods
+
+		private void WriteEmacsProject(FileReference EmacsProjectPath)
+		{
+			ProjectDescriptor ProjectDescriptor = ProjectDescriptor.FromFile(OnlyGameProject);
+			using (JsonWriter Writer = new JsonWriter(EmacsProjectPath, JsonWriterStyle.Readable))
+			{
+				Writer.WriteObjectStart();
+				
+				Writer.WriteObjectStart("project");
+				Writer.WriteValue("name", GameProjectName);
+				Writer.WriteValue("file", OnlyGameProject.FullName);
+				Writer.WriteStringArrayField("platforms", SupportedPlatforms.Select(P => P.ToString()));
+				Writer.WriteStringArrayField("configurations", SupportedConfigurations.Select(C => C.ToString()));
+				Writer.WriteObjectEnd();
+				
+				Writer.WriteObjectStart("engine");
+				Writer.WriteValue("version", ProjectDescriptor.EngineAssociation);
+				Writer.WriteValue("root", UnrealBuildTool.RootDirectory.FullName);
+				Writer.WriteObjectEnd();
+				
+				Writer.WriteObjectEnd();
+			}
+		}
 
 		/// <summary>
 		/// Writes Clang compilation database to the file under the given path. 

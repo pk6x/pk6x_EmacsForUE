@@ -85,10 +85,10 @@ index 00000000000..2bd7adf2149
 \ No newline at end of file
 diff --git a/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
 new file mode 100644
-index 00000000000..91eb6d39dc1
+index 00000000000..6a582030a81
 --- /dev/null
 +++ b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
-@@ -0,0 +1,293 @@
+@@ -0,0 +1,327 @@
 +// Copyright (c) 2021 Oleksandr Manenko
 +//
 +// Permission is  hereby granted, free  of charge,  to any person  obtaining a
@@ -116,6 +116,9 @@ index 00000000000..91eb6d39dc1
 +
 +namespace UnrealBuildTool
 +{
++	/// <summary>
++	/// Generator of Unreal Emacs project files.
++	/// </summary>
 +	internal class UnrealEmacsProjectFileGenerator : ProjectFileGenerator
 +	{
 +		#region Fields and properties
@@ -212,14 +215,22 @@ index 00000000000..91eb6d39dc1
 +			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 +		{
 +			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
-+			EmacsProjectDirectory = DirectoryReference.Combine(MasterProjectPath, ProjectFileExtension);
++			EmacsProjectDirectory = MasterProjectPath;
 +
 +			// The directory is unused for now but in the future it will contain project specific data
 +			// so that Emacs code can use it.
 +			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
++
++			// Write Clang compilation database to the project root so that it could be used by autocomplete
++			// backends.
 +			FileReference CompilationDatabasePath = FileReference.Combine(MasterProjectPath,
 +				"compile_commands.json");
 +			WriteCompilationDatabase(CompilationDatabasePath, FileToCompileCommand);
++
++			// Write project file
++			FileReference EmacsProjectPath = FileReference.Combine(EmacsProjectDirectory,
++				ProjectFileExtension);
++			WriteEmacsProject(EmacsProjectPath);
 +
 +			return true;
 +		}
@@ -247,6 +258,29 @@ index 00000000000..91eb6d39dc1
 +		#endregion
 +
 +		#region Methods
++
++		private void WriteEmacsProject(FileReference EmacsProjectPath)
++		{
++			ProjectDescriptor ProjectDescriptor = ProjectDescriptor.FromFile(OnlyGameProject);
++			using (JsonWriter Writer = new JsonWriter(EmacsProjectPath, JsonWriterStyle.Readable))
++			{
++				Writer.WriteObjectStart();
++				
++				Writer.WriteObjectStart("project");
++				Writer.WriteValue("name", GameProjectName);
++				Writer.WriteValue("file", OnlyGameProject.FullName);
++				Writer.WriteStringArrayField("platforms", SupportedPlatforms.Select(P => P.ToString()));
++				Writer.WriteStringArrayField("configurations", SupportedConfigurations.Select(C => C.ToString()));
++				Writer.WriteObjectEnd();
++				
++				Writer.WriteObjectStart("engine");
++				Writer.WriteValue("version", ProjectDescriptor.EngineAssociation);
++				Writer.WriteValue("root", UnrealBuildTool.RootDirectory.FullName);
++				Writer.WriteObjectEnd();
++				
++				Writer.WriteObjectEnd();
++			}
++		}
 +
 +		/// <summary>
 +		/// Writes Clang compilation database to the file under the given path. 
@@ -481,6 +515,18 @@ index aec2d642e2b..b2c47d47e7e 100644
  		}
  	}
  }
+diff --git a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
+index 8497d6a7fde..5086bcf6fef 100644
+--- a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
++++ b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
+@@ -411,6 +411,7 @@ namespace UnrealBuildTool
+ 			[CommandLine("-VSMac", Value="GenerateProjectFiles")]
+ 			[CommandLine("-CLion", Value="GenerateProjectFiles")]
+ 			[CommandLine("-Rider", Value="GenerateProjectFiles")]
++			[CommandLine("-UnrealEmacs", Value="GenerateProjectFiles")]
+ 			public string Mode = null;
+ 
+ 			/// <summary>
 diff --git a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 index 2736ef225e2..ebc7964b579 100644
 --- a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
