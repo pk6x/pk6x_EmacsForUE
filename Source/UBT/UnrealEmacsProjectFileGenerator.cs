@@ -124,10 +124,7 @@ namespace UnrealBuildTool
 			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
 			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
-			EmacsProjectDirectory = MasterProjectPath;
-
-			// The directory is unused for now but in the future it will contain project specific data
-			// so that Emacs code can use it.
+			EmacsProjectDirectory = DirectoryReference.Combine(MasterProjectPath, ProjectFileExtension);
 			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
 
 			// Write Clang compilation database to the project root so that it could be used by autocomplete
@@ -137,8 +134,7 @@ namespace UnrealBuildTool
 			WriteCompilationDatabase(CompilationDatabasePath, FileToCompileCommand);
 
 			// Write project file
-			FileReference EmacsProjectPath = FileReference.Combine(EmacsProjectDirectory,
-				ProjectFileExtension);
+			FileReference EmacsProjectPath = FileReference.Combine(EmacsProjectDirectory, "project.json");
 			WriteEmacsProject(EmacsProjectPath);
 
 			return true;
@@ -170,25 +166,111 @@ namespace UnrealBuildTool
 
 		private void WriteEmacsProject(FileReference EmacsProjectPath)
 		{
-			ProjectDescriptor ProjectDescriptor = ProjectDescriptor.FromFile(OnlyGameProject);
+			UnrealTargetPlatform HostPlatform      = BuildHostPlatform.Current.Platform;
+			ProjectDescriptor    ProjectDescriptor = ProjectDescriptor.FromFile(OnlyGameProject);
+			DirectoryReference BatchFilesDir = DirectoryReference.Combine(UnrealBuildTool.EngineDirectory,
+				"Build", "BatchFiles");
+			FileReference LinuxBuildScript   = FileReference.Combine(BatchFilesDir, "Linux", "Build.sh");
+			FileReference MacBuildScript     = FileReference.Combine(BatchFilesDir, "Mac", "Build.sh");
+			FileReference WindowsBuildScript = FileReference.Combine(BatchFilesDir, "Build.bat");
+			string[]      Products           = { GameProjectName, $"{GameProjectName}Editor" };
+
+			FileReference BuildScript = null;
+			string        ExecScript  = null;
+			if (HostPlatform == UnrealTargetPlatform.Linux)
+			{
+				BuildScript = LinuxBuildScript;
+				ExecScript  = "bash";
+			}
+			else if (HostPlatform == UnrealTargetPlatform.Mac)
+			{
+				BuildScript = MacBuildScript;
+				ExecScript  = "bash";
+			}
+			else if (HostPlatform == UnrealTargetPlatform.Win64 || HostPlatform == UnrealTargetPlatform.Win32)
+			{
+				BuildScript = WindowsBuildScript;
+				ExecScript  = "call";
+			}
+			else
+			{
+				throw new BuildException("Unsupported host platform {0}", HostPlatform);
+			}
+
 			using (JsonWriter Writer = new JsonWriter(EmacsProjectPath, JsonWriterStyle.Readable))
 			{
 				Writer.WriteObjectStart();
-				
-				Writer.WriteObjectStart("project");
-				Writer.WriteValue("name", GameProjectName);
-				Writer.WriteValue("file", OnlyGameProject.FullName);
-				Writer.WriteStringArrayField("platforms", SupportedPlatforms.Select(P => P.ToString()));
-				Writer.WriteStringArrayField("configurations", SupportedConfigurations.Select(C => C.ToString()));
-				Writer.WriteObjectEnd();
-				
-				Writer.WriteObjectStart("engine");
-				Writer.WriteValue("version", ProjectDescriptor.EngineAssociation);
-				Writer.WriteValue("root", UnrealBuildTool.RootDirectory.FullName);
-				Writer.WriteObjectEnd();
-				
-				Writer.WriteObjectEnd();
+
+				Writer.WriteValue("version", "1.0"); // File format version
+				WriteProjectInfo(Writer, Products, ExecScript, BuildScript);
+				WriteEngineInfo(Writer, ProjectDescriptor, LinuxBuildScript, MacBuildScript, WindowsBuildScript);
+
+				Writer.WriteObjectEnd(); // root
 			}
+		}
+
+		private void WriteProjectInfo(JsonWriter Writer, IEnumerable<string> Products, string ExecScript,
+			FileReference BuildScript)
+		{
+			// TODO: Dependencies? So that we can navigate to the modules this one depends on?
+			Writer.WriteObjectStart("project");
+			
+			Writer.WriteValue("name", GameProjectName);
+			Writer.WriteValue("file", OnlyGameProject.FullName);
+			Writer.WriteStringArrayField("platforms", SupportedPlatforms.Select(P => P.ToString()));
+			Writer.WriteStringArrayField("configurations", SupportedConfigurations.Select(C => C.ToString()));
+			
+			Writer.WriteObjectStart("tasks");
+			WriteProjectBuildTasks(Writer, Products, ExecScript, BuildScript);
+			Writer.WriteObjectEnd(); // project/tasks
+			
+			Writer.WriteObjectEnd(); // project
+		}
+
+		private void WriteEngineInfo(JsonWriter Writer, ProjectDescriptor ProjectDescriptor,
+			FileReference LinuxBuildScript, FileReference MacBuildScript, FileReference WindowsBuildScript)
+		{
+			Writer.WriteObjectStart("engine");
+			
+			Writer.WriteValue("version", ProjectDescriptor.EngineAssociation);
+			Writer.WriteValue("root", UnrealBuildTool.RootDirectory.FullName);
+			
+			// TODO: Path to the unreal header tool?
+
+			Writer.WriteObjectStart("scripts");
+			
+			Writer.WriteObjectStart("build");
+			Writer.WriteValue("linux", LinuxBuildScript.FullName);
+			Writer.WriteValue("mac", MacBuildScript.FullName);
+			Writer.WriteValue("windows", WindowsBuildScript.FullName);
+			Writer.WriteObjectEnd(); // engine/scripts/build
+			
+			Writer.WriteObjectEnd(); // engine/scripts
+			
+			Writer.WriteObjectEnd(); // engine
+		}
+
+		private void WriteProjectBuildTasks(JsonWriter Writer, IEnumerable<string> Products, string ExecScript,
+			FileReference BuildScript)
+		{
+			Writer.WriteObjectStart("build");
+
+			foreach (string Product in Products)
+			{
+				foreach (UnrealTargetPlatform Platform in SupportedPlatforms)
+				{
+					foreach (UnrealTargetConfiguration Configuration in SupportedConfigurations)
+					{
+						string TargetName = $"{Product}-{Platform}-{Configuration}";
+						string Command =
+							$"{ExecScript} \"{BuildScript}\" {Product} {Platform} {Configuration} -project=\"{OnlyGameProject.FullName}\"";
+
+						Writer.WriteValue(TargetName, Command);
+					}
+				}
+			}
+
+			Writer.WriteObjectEnd(); // project/tasks/build
 		}
 
 		/// <summary>
@@ -311,8 +393,8 @@ namespace UnrealBuildTool
 			}
 			else if (HostPlatform == UnrealTargetPlatform.Mac)
 			{
-				MacToolChainSettings Settings = new MacToolChainSettings(false);
-				DirectoryReference ToolchainDir = DirectoryReference.FromString(Settings.ToolchainDir);
+				MacToolChainSettings Settings     = new MacToolChainSettings(false);
+				DirectoryReference   ToolchainDir = DirectoryReference.FromString(Settings.ToolchainDir);
 
 				return FileReference.Combine(ToolchainDir, "clang++");
 			}

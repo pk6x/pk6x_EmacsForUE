@@ -123,8 +123,9 @@ bool FEmacsSourceCodeAccessor::OpenSolution()
 	}
 
 	const FString ProjectFileLocation = FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath());
+	const FString ProjectDirectory    = FPaths::GetPath(ProjectFileLocation);
 
-	return OpenSolutionAtPath(ProjectFileLocation);
+	return OpenSolutionAtPath(ProjectDirectory);
 }
 
 /**
@@ -245,7 +246,7 @@ bool FEmacsSourceCodeAccessor::SaveAllOpenDocuments() const
 	        FString Response;
 	        bStatus = EvalEmacsCommand(SaveAllProjectBuffersCommand, Response);
 
-	        UE_LOG(LogEmacs, Warning, TEXT("Sent command to Emacs. The status is: %d. Response is '%s'"), bStatus,
+	        UE_LOG(LogEmacs, Warning, TEXT("A command has been sent to Emacs. The status is: %d. Response is '%s'"), bStatus,
 	   *Response);
 	*/
 
