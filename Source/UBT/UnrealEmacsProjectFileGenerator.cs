@@ -418,26 +418,31 @@ namespace UnrealBuildTool
 				TargetRules, BinaryCompileEnvironment);
 
 			StringBuilder CompileCommand = new StringBuilder($"\"{ClangCompilerPath.FullName}\" ");
+
+			string ForceIncludeFormat  = GetForceIncludeFormatTemplate();
+			string SystemIncludeFormat = GetSystemIncludeFormatTemplate();
+			string UserIncludeFormat   = GetUserIncludeFormatTemplate();
+			string DefinitionFormat    = GetDefinitionFormatTemplate();
+			
 			foreach (FileItem File in ModuleCompileEnvironment.ForceIncludeFiles)
 			{
-				CompileCommand.AppendFormat(" -include \"{0}\"", File.FullName);
-			}
-
-			foreach (string Definition in ModuleCompileEnvironment.Definitions)
-			{
-				CompileCommand.AppendFormat(" -D\"{0}\"", Definition);
+				CompileCommand.AppendFormat(ForceIncludeFormat, File.FullName);
 			}
 
 			foreach (DirectoryReference Path in ModuleCompileEnvironment.UserIncludePaths)
 			{
-				CompileCommand.AppendFormat(" -I\"{0}\"", Path);
+				CompileCommand.AppendFormat(UserIncludeFormat, Path);
 			}
 
 			foreach (DirectoryReference Path in ModuleCompileEnvironment.SystemIncludePaths)
 			{
-				CompileCommand.AppendFormat(" -I\"{0}\"", Path);
+				CompileCommand.AppendFormat(SystemIncludeFormat, Path);
 			}
 
+			foreach (string Definition in ModuleCompileEnvironment.Definitions)
+			{
+				CompileCommand.AppendFormat(DefinitionFormat, Definition);
+			}
 
 			UEBuildModuleCPP.InputFileCollection InputFiles = Module.FindInputFiles(
 				TargetRules.Platform, new Dictionary<DirectoryItem, FileItem[]>());
@@ -450,6 +455,33 @@ namespace UnrealBuildTool
 			{
 				FileToCompileCommand[File.Location] = $"{CompileCommand} \"{File.FullName}\"";
 			}
+		}
+
+		private string GetForceIncludeFormatTemplate()
+		{
+			return IsNonWindowsHost() ? " -include \"{0}\"" : " /FI\"{0}\"";
+		}
+		
+		private string GetDefinitionFormatTemplate()
+		{
+			return IsNonWindowsHost() ? " -D\"{0}\"" : " /D\"{0}\"";
+		}
+		
+		private string GetUserIncludeFormatTemplate()
+		{
+			return IsNonWindowsHost() ? " -I\"{0}\"" : " /I\"{0}\"";
+		}
+		
+		private string GetSystemIncludeFormatTemplate()
+		{
+			return IsNonWindowsHost() ? " -I\"{0}\"" : " /I\"{0}\"";
+		}
+
+		private bool IsNonWindowsHost()
+		{
+			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
+
+			return HostPlatform != UnrealTargetPlatform.Win64 && HostPlatform != UnrealTargetPlatform.Win32;
 		}
 
 		private UEBuildTarget CreateBuildTarget(UnrealTargetPlatform Platform, UnrealTargetConfiguration Configuration,
