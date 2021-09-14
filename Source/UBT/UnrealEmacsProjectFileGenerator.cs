@@ -166,7 +166,7 @@ namespace UnrealBuildTool
 			}
 
 			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
-			EmacsProjectDirectory = DirectoryReference.Combine(GameProjectFile.BaseDir, ".emacs");
+			EmacsProjectDirectory = DirectoryReference.Combine(GameProjectFile.BaseDir, ".uemacs");
 			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
 
 			// Filter out platforms we cannot build

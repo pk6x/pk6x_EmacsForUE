@@ -22,11 +22,32 @@ index a42da4931c5..07764de7053 100644
  				}
 diff --git a/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFile.cs b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFile.cs
 new file mode 100644
-index 00000000000..83daf77772f
+index 00000000000..71de6d7c447
 --- /dev/null
 +++ b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFile.cs
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,75 @@
++// Copyright (c) 2021 Oleksandr Manenko
++//
++// Permission is  hereby granted, free  of charge,  to any person  obtaining a
++// copy of this software and  associated documentation files (the "Software"),
++// to deal in  the Software without restriction,  including without limitation
++// the rights  to use, copy,  modify, merge, publish,  distribute, sublicense,
++// and/or  sell copies  of the  Software, and  to permit  persons to  whom the
++// Software is furnished to do so, subject to the following conditions:
++//
++// The above copyright notice and this  permission notice shall be included in
++// all copies or substantial portions of the Software.
++//
++// THE SOFTWARE IS PROVIDED "AS IS",  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING  BUT NOT LIMITED  TO THE WARRANTIES  OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR  COPYRIGHT HOLDERS  BE LIABLE  FOR ANY  CLAIM, DAMAGES  OR OTHER
++// LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR  OTHERWISE, ARISING
++// FROM,  OUT OF  OR IN  CONNECTION  WITH THE  SOFTWARE  OR THE  USE OR  OTHER
++// DEALINGS IN THE SOFTWARE.
++
 +using System.Collections.Generic;
++using System.Linq;
 +using Tools.DotNETCommon;
 +
 +namespace UnrealBuildTool
@@ -42,7 +63,8 @@ index 00000000000..83daf77772f
 +		/// <param name="InProjectFilePath">
 +		/// The path to the project file, relative to the master project file.
 +		/// </param>
-+		public UnrealEmacsProjectFile(FileReference InProjectFilePath) : base(InProjectFilePath)
++		public UnrealEmacsProjectFile(FileReference InProjectFilePath)
++			: base(InProjectFilePath)
 +		{
 +		}
 +
@@ -57,18 +79,55 @@ index 00000000000..83daf77772f
 +			List<UnrealTargetConfiguration> InConfigurations,
 +			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 +		{
-+			// We do nothing at the moment, however there are plans to extend this.
 +			return true;
++		}
++
++		private void WriteBinariesMetadata(JsonWriter Writer, IEnumerable<UEBuildBinary> Binaries)
++		{
++			Writer.WriteArrayStart("Binaries");
++			foreach (UEBuildBinary Binary in Binaries)
++			{
++				Writer.WriteObjectStart();
++
++				Writer.WriteStringArrayField("Files", Binary.OutputFilePaths.Select(FP => FP.FullName));
++				Writer.WriteValue("Type", Binary.Type.ToString());
++
++				// TODO: Write modules in the future?
++
++				Writer.WriteObjectEnd();
++			}
++
++			Writer.WriteArrayEnd();
 +		}
 +	}
 +}
 \ No newline at end of file
 diff --git a/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
 new file mode 100644
-index 00000000000..8d3d11f6fe9
+index 00000000000..ebb6eae30de
 --- /dev/null
 +++ b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
-@@ -0,0 +1,273 @@
+@@ -0,0 +1,575 @@
++// Copyright (c) 2021 Oleksandr Manenko
++//
++// Permission is  hereby granted, free  of charge,  to any person  obtaining a
++// copy of this software and  associated documentation files (the "Software"),
++// to deal in  the Software without restriction,  including without limitation
++// the rights  to use, copy,  modify, merge, publish,  distribute, sublicense,
++// and/or  sell copies  of the  Software, and  to permit  persons to  whom the
++// Software is furnished to do so, subject to the following conditions:
++//
++// The above copyright notice and this  permission notice shall be included in
++// all copies or substantial portions of the Software.
++//
++// THE SOFTWARE IS PROVIDED "AS IS",  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING  BUT NOT LIMITED  TO THE WARRANTIES  OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR  COPYRIGHT HOLDERS  BE LIABLE  FOR ANY  CLAIM, DAMAGES  OR OTHER
++// LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR  OTHERWISE, ARISING
++// FROM,  OUT OF  OR IN  CONNECTION  WITH THE  SOFTWARE  OR THE  USE OR  OTHER
++// DEALINGS IN THE SOFTWARE.
++
 +using System.Collections.Generic;
 +using System.Linq;
 +using System.Text;
@@ -76,14 +135,15 @@ index 00000000000..8d3d11f6fe9
 +
 +namespace UnrealBuildTool
 +{
++	/// <summary>
++	/// Generator of Unreal Emacs project files.
++	/// </summary>
 +	internal class UnrealEmacsProjectFileGenerator : ProjectFileGenerator
 +	{
 +		#region Fields and properties
 +
 +		/// <summary>
 +		/// File extension for project files we'll be generating.
-+		///
-+		/// In case of Unreal Emacs, a project 'file' is a directory, which name is '.uemacs'.
 +		/// </summary>
 +		public override string ProjectFileExtension
 +		{
@@ -106,6 +166,20 @@ index 00000000000..8d3d11f6fe9
 +		private readonly Dictionary<FileReference, string> FileToCompileCommand =
 +			new Dictionary<FileReference, string>();
 +
++		/// <summary>
++		/// Whether the project file has to be as small as possible or human readable.
++		/// </summary>
++		private readonly bool bCompactProjectFile = false;
++
++		/// <summary>
++		/// Project format version.
++		/// </summary>
++		private readonly string ProjectFileFormatVersion = "1.0";
++
++		private readonly FileReference LinuxBuildScript;
++		private readonly FileReference MacBuildScript;
++		private readonly FileReference WindowsBuildScript;
++
 +		#endregion
 +
 +		#region Construction
@@ -117,15 +191,43 @@ index 00000000000..8d3d11f6fe9
 +		/// <param name="InArguments">
 +		/// The command line arguments used to customize default behavior of the generator.
 +		/// </param>
-+		public UnrealEmacsProjectFileGenerator(FileReference InOnlyGameProject,
-+			CommandLineArguments InArguments) : base(InOnlyGameProject)
++		public UnrealEmacsProjectFileGenerator(FileReference InOnlyGameProject, CommandLineArguments InArguments)
++			: base(InOnlyGameProject)
 +		{
 +			// Ignoring command-line arguments at the moment.
++
++			// Store paths to build scripts so that we can write them to the Unreal Emacs project file later
++			DirectoryReference BatchFilesDir = DirectoryReference.Combine(UnrealBuildTool.EngineDirectory,
++				"Build", "BatchFiles");
++			LinuxBuildScript   = FileReference.Combine(BatchFilesDir, "Linux", "Build.sh");
++			MacBuildScript     = FileReference.Combine(BatchFilesDir, "Mac", "Build.sh");
++			WindowsBuildScript = FileReference.Combine(BatchFilesDir, "Build.bat");
 +		}
 +
 +		#endregion
 +
 +		#region Overrides
++
++		/// <summary>
++		/// Generates Unreal Emacs project files for all available (and buildable) engine and game targets.
++		/// Does not actually build anything.
++		/// </summary>
++		/// <param name="PlatformProjectGenerators">The registered platform project generators.</param>
++		/// <param name="Arguments">Command-line arguments.</param>
++		public override bool GenerateProjectFiles(PlatformProjectGeneratorCollection PlatformProjectGenerators,
++			string[] Arguments)
++		{
++			if (OnlyGameProject == null)
++			{
++				// Unreal Emacs has no support of multiple projects at the moment.
++				Log.TraceWarning(
++					"Unreal Emacs can build game projects only at the moment. Skipping project generation.");
++
++				return false;
++			}
++
++			return base.GenerateProjectFiles(PlatformProjectGenerators, Arguments);
++		}
 +
 +		/// <summary>
 +		/// Clean project files.
@@ -137,6 +239,8 @@ index 00000000000..8d3d11f6fe9
 +			string InMasterProjectName,
 +			DirectoryReference InIntermediateProjectFilesDirectory)
 +		{
++			// TODO: Do not delete files generated by `ue.el`.
++			DirectoryReference.Delete(InMasterProjectDirectory);
 +		}
 +
 +		/// <summary>
@@ -151,7 +255,6 @@ index 00000000000..8d3d11f6fe9
 +			return new UnrealEmacsProjectFolder(OwnerProjectFileGenerator, FolderName);
 +		}
 +
-+
 +		/// <summary>
 +		/// Allocates a generator-specific project file object.
 +		/// </summary>
@@ -160,6 +263,33 @@ index 00000000000..8d3d11f6fe9
 +		protected override ProjectFile AllocateProjectFile(FileReference InitFilePath)
 +		{
 +			return new UnrealEmacsProjectFile(InitFilePath);
++		}
++
++		protected override bool WriteProjectFiles(PlatformProjectGeneratorCollection PlatformProjectGenerators)
++		{
++			ProjectFile GameProjectFile = GeneratedProjectFiles.FirstOrDefault(IsGameProjectFile);
++			if (GameProjectFile == null)
++			{
++				Log.TraceError("Cannot find a game project. Aborting.");
++
++				return false;
++			}
++
++			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
++			EmacsProjectDirectory = DirectoryReference.Combine(GameProjectFile.BaseDir, ".uemacs");
++			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
++
++			// Filter out platforms we cannot build
++			List<UnrealTargetPlatform> BuildablePlatforms = SupportedPlatforms
++				.Where(IsPlatformSupported)
++				.ToList();
++
++			WriteEmacsProject(OnlyGameProject, BuildablePlatforms, SupportedConfigurations,
++				GameProjectFile.ProjectTargets);
++
++			WriteCompilationDatabase(FileReference.Combine(GameProjectFile.BaseDir, "compile_commands.json"));
++
++			return true;
 +		}
 +
 +		/// <summary>
@@ -171,16 +301,7 @@ index 00000000000..8d3d11f6fe9
 +		protected override bool WriteMasterProjectFile(ProjectFile UBTProject,
 +			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 +		{
-+			EngineRootDirectory   = UnrealBuildTool.RootDirectory;
-+			EmacsProjectDirectory = DirectoryReference.Combine(MasterProjectPath, ProjectFileExtension);
-+
-+			// The directory is unused for now but in the future it will contain project specific data
-+			// so that Emacs code can use it.
-+			DirectoryReference.CreateDirectory(EmacsProjectDirectory);
-+			FileReference CompilationDatabasePath = FileReference.Combine(MasterProjectPath,
-+				"compile_commands.json");
-+			WriteCompilationDatabase(CompilationDatabasePath, FileToCompileCommand);
-+
++			// There is no master project file for Unreal Emacs
 +			return true;
 +		}
 +
@@ -193,14 +314,12 @@ index 00000000000..8d3d11f6fe9
 +				return;
 +			}
 +
-+			FileReference ClangCompilerPath = FindClangCompiler(Target);
-+			CppCompileEnvironment GlobalCompileEnvironment =
-+				Target.CreateCompileEnvironmentForProjectFiles();
++			FileReference         ClangCompilerPath  = FindClangCompiler(Target);
++			CppCompileEnvironment CompileEnvironment = Target.CreateCompileEnvironmentForProjectFiles();
 +
 +			foreach (UEBuildBinary Binary in Target.Binaries)
 +			{
-+				GenerateCompileCommandsForBinary(Binary, Target, GlobalCompileEnvironment,
-+					ClangCompilerPath);
++				GenerateCompileCommandsForBinary(Binary, Target, CompileEnvironment, ClangCompilerPath);
 +			}
 +		}
 +
@@ -208,15 +327,155 @@ index 00000000000..8d3d11f6fe9
 +
 +		#region Methods
 +
++		private bool IsGameProjectFile(ProjectFile ProjectFile)
++		{
++			return ProjectFile.BaseDir == OnlyGameProject.Directory;
++		}
++
++		private static bool IsPlatformSupported(UnrealTargetPlatform Platform)
++		{
++			if (!UEBuildPlatform.IsPlatformAvailable(Platform))
++			{
++				return false;
++			}
++
++			return UEBuildPlatform
++				.GetPlatformGroups(BuildHostPlatform.Current.Platform)
++				.Any(Group => IsPlatformSupported(Platform, Group));
++		}
++
++		private static bool IsPlatformSupported(UnrealTargetPlatform Platform, UnrealPlatformGroup Group)
++		{
++			return UEBuildPlatform.IsPlatformInGroup(Platform, Group) &&
++			       Group != UnrealPlatformGroup.Desktop;
++		}
++
++		private void WriteEmacsProject(FileReference ProjectFile, List<UnrealTargetPlatform> Platforms,
++			List<UnrealTargetConfiguration> Configurations, List<ProjectTarget> Targets)
++		{
++			FileReference ProjectFileLocation = FileReference.Combine(EmacsProjectDirectory, "project.json");
++
++			JsonWriterStyle WriterStyle = bCompactProjectFile ? JsonWriterStyle.Compact : JsonWriterStyle.Readable;
++			using (JsonWriter Writer = new JsonWriter(ProjectFileLocation, WriterStyle))
++			{
++				Writer.WriteObjectStart();
++
++				Writer.WriteValue("Version", ProjectFileFormatVersion);
++
++				WriteEmacsProjectMetadata(Writer, ProjectFile, Platforms, Configurations, Targets);
++				WriteEmacsProjectEngineMetadata(Writer, ProjectFile);
++
++				Writer.WriteObjectEnd();
++			}
++		}
++
++		private void WriteEmacsProjectMetadata(
++			JsonWriter Writer,
++			FileReference ProjectFile,
++			List<UnrealTargetPlatform> Platforms,
++			List<UnrealTargetConfiguration> Configurations,
++			List<ProjectTarget> Targets)
++		{
++			string ProjectName = ProjectFile.GetFileNameWithoutAnyExtensions();
++			Writer.WriteObjectStart("Project");
++
++			Writer.WriteValue("Name", ProjectName);
++			Writer.WriteValue("File", ProjectFile.FullName);
++
++			WriteEmacsProjectTargets(Writer, Platforms, Configurations, Targets);
++
++			Writer.WriteObjectEnd(); // Project
++		}
++
++		private void WriteEmacsProjectTargets(JsonWriter Writer, List<UnrealTargetPlatform> Platforms,
++			List<UnrealTargetConfiguration> Configurations, List<ProjectTarget> Targets)
++		{
++			Writer.WriteObjectStart("Targets");
++
++			foreach (UnrealTargetPlatform Platform in Platforms)
++			{
++				foreach (UnrealTargetConfiguration Configuration in SupportedConfigurations)
++				{
++					foreach (ProjectTarget Target in Targets)
++					{
++						UEBuildTarget BuildTarget;
++
++						try
++						{
++							BuildTarget = CreateBuildTarget(Platform, Configuration, Target);
++						}
++						catch (BuildException e)
++						{
++							Log.TraceVerbose(e.Message);
++							continue;
++						}
++
++						WriteEmacsProjectTarget(Writer, BuildTarget);
++					}
++				}
++			}
++
++			Writer.WriteObjectEnd(); // Project/Targets
++		}
++
++		private void WriteEmacsProjectTarget(JsonWriter Writer, UEBuildTarget Target)
++		{
++			UEBuildBinary Binary = Target.Binaries.First(B => B.Type == UEBuildBinaryType.Executable);
++
++			string TargetName     = Target.TargetName;
++			string TargetType     = Target.TargetType.ToString();
++			string Configuration  = Target.Configuration.ToString();
++			string Platform       = Target.Platform.ToString();
++			string TargetFullName = Target.ReceiptFileName.GetFileNameWithoutAnyExtensions();
++			string BinaryFile     = Binary.OutputFilePaths.First().FullName;
++
++			Writer.WriteObjectStart(TargetFullName);
++
++			Writer.WriteValue("Name", TargetName);
++			Writer.WriteValue("Configuration", Configuration);
++			Writer.WriteValue("Platform", Platform);
++			Writer.WriteValue("Type", TargetType);
++			Writer.WriteValue("Binary", BinaryFile);
++
++			WriteEmacsProjectTargetTasks(Writer, Target, BinaryFile);
++
++			Writer.WriteObjectEnd(); // Project/Targets/$TargetName$
++		}
++
++		private void WriteEmacsProjectTargetTasks(JsonWriter Writer, UEBuildTarget Target, string BinaryFile)
++		{
++			Writer.WriteObjectStart("Tasks");
++			
++			Writer.WriteValue("Build", GetBuildCommand(Target));
++			Writer.WriteValue("Run", GetRunCommand(Target, BinaryFile));
++		
++			Writer.WriteObjectEnd(); // Project/Targets/$TargetName$/Tasks
++		}
++
++		private void WriteEmacsProjectEngineMetadata(JsonWriter Writer, FileReference ProjectFile)
++		{
++			ProjectDescriptor ProjectDescriptor = ProjectDescriptor.FromFile(ProjectFile);
++
++			Writer.WriteObjectStart("Engine");
++
++			Writer.WriteValue("Version", ProjectDescriptor.EngineAssociation);
++			Writer.WriteValue("Root", UnrealBuildTool.RootDirectory.FullName);
++
++			// TODO: Path to the unreal header tool? This could be useful if we want to add new files and generate
++			//       "*.generated.h" files automatically.
++
++			Writer.WriteObjectStart("Scripts");
++			Writer.WriteValue("Build", GetBuildScriptLocation().FullName);
++			Writer.WriteObjectEnd(); // Engine/Scripts
++
++			Writer.WriteObjectEnd(); // Engine
++		}
++
 +		/// <summary>
 +		/// Writes Clang compilation database to the file under the given path. 
 +		/// </summary>
 +		/// <param name="CompilationDatabasePath">Path to the 'compile_commands.json' file.</param>
-+		/// <param name="FileToCompileCommand">
-+		/// An enumerable collection of File->CompilationCommand pairs.
-+		/// </param>
-+		private void WriteCompilationDatabase(FileReference CompilationDatabasePath,
-+			IEnumerable<KeyValuePair<FileReference, string>> FileToCompileCommand)
++		private void WriteCompilationDatabase(FileReference CompilationDatabasePath)
 +		{
 +			using (JsonWriter Writer = new JsonWriter(CompilationDatabasePath, JsonWriterStyle.Compact))
 +			{
@@ -240,7 +499,7 @@ index 00000000000..8d3d11f6fe9
 +		/// the <see cref="FileToCompileCommand"/> dictionary.
 +		/// </summary>
 +		/// <param name="Binary">A binary to generate compile commands for.</param>
-+		/// <param name="Target">The <see cref="Binary"/>'s target.</param>
++		/// <param name="Target">The target's binary.</param>
 +		/// <param name="GlobalCompileEnvironment">The global compile environment to copy settings from.</param>
 +		/// <param name="ClangCompilerPath">The path to the clang++ executable.</param>
 +		private void GenerateCompileCommandsForBinary(UEBuildBinary Binary, UEBuildTarget Target,
@@ -250,8 +509,7 @@ index 00000000000..8d3d11f6fe9
 +				GlobalCompileEnvironment);
 +			foreach (UEBuildModuleCPP Module in Binary.Modules.OfType<UEBuildModuleCPP>())
 +			{
-+				GenerateCompileCommandsForModule(Module, Target.Rules, BinaryCompileEnvironment,
-+					ClangCompilerPath);
++				GenerateCompileCommandsForModule(Module, Target.Rules, BinaryCompileEnvironment, ClangCompilerPath);
 +			}
 +		}
 +
@@ -263,7 +521,7 @@ index 00000000000..8d3d11f6fe9
 +		/// <param name="TargetRules">The target rules to configure the module's compile environment.</param>
 +		/// <param name="BinaryCompileEnvironment">The compile environment to copy settings from.</param>
 +		/// <param name="ClangCompilerPath">The path to the clang++ executable.</param>
-+		private void GenerateCompileCommandsForModule(UEBuildModuleCPP Module, ReadOnlyTargetRules TargetRules,
++		private void GenerateCompileCommandsForModule(UEBuildModuleCPP Module, ReadOnlyTargetRules TargetRules, 
 +			CppCompileEnvironment BinaryCompileEnvironment, FileReference ClangCompilerPath)
 +		{
 +			CppCompileEnvironment ModuleCompileEnvironment = Module.CreateModuleCompileEnvironment(
@@ -304,6 +562,24 @@ index 00000000000..8d3d11f6fe9
 +			}
 +		}
 +
++		private UEBuildTarget CreateBuildTarget(UnrealTargetPlatform Platform, UnrealTargetConfiguration Configuration,
++			ProjectTarget Target)
++		{
++			string DefaultArchitecture = UEBuildPlatform
++				.GetBuildPlatform(Platform)
++				.GetDefaultArchitecture(Target.UnrealProjectFilePath);
++
++			TargetDescriptor TargetDescriptor = new TargetDescriptor(
++				Target.UnrealProjectFilePath,
++				Target.Name,
++				Platform,
++				Configuration,
++				DefaultArchitecture,
++				null);
++
++			return UEBuildTarget.Create(TargetDescriptor, false, false);
++		}
++
 +		/// <summary>
 +		/// Searches for the Clang compiler for the given platform.
 +		/// </summary>
@@ -328,8 +604,8 @@ index 00000000000..8d3d11f6fe9
 +			}
 +			else if (HostPlatform == UnrealTargetPlatform.Mac)
 +			{
-+				MacToolChainSettings Settings = new MacToolChainSettings(false);
-+				DirectoryReference ToolchainDir = DirectoryReference.FromString(Settings.ToolchainDir);
++				MacToolChainSettings Settings     = new MacToolChainSettings(false);
++				DirectoryReference   ToolchainDir = DirectoryReference.FromString(Settings.ToolchainDir);
 +
 +				return FileReference.Combine(ToolchainDir, "clang++");
 +			}
@@ -338,6 +614,71 @@ index 00000000000..8d3d11f6fe9
 +				return FileReference.FromString("clang++");
 +			}
 +		}
++		
++		private FileReference GetBuildScriptLocation()
++		{
++			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
++
++			if (HostPlatform == UnrealTargetPlatform.Linux)
++			{
++				return LinuxBuildScript;
++			}
++			else if (HostPlatform == UnrealTargetPlatform.Mac)
++			{
++				return MacBuildScript;
++			}
++			else if (HostPlatform == UnrealTargetPlatform.Win64 || HostPlatform == UnrealTargetPlatform.Win32)
++			{
++				return WindowsBuildScript;
++			}
++
++			throw new BuildException("Unsupported host platform {0}", HostPlatform);
++		}
++
++		private string GetShellScriptExecutor()
++		{
++			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
++			
++			if (HostPlatform == UnrealTargetPlatform.Linux || HostPlatform == UnrealTargetPlatform.Mac)
++			{
++				return "bash";
++			}
++			else if (HostPlatform == UnrealTargetPlatform.Win64 || HostPlatform == UnrealTargetPlatform.Win32)
++			{
++				return "call";
++			}
++			else
++			{
++				throw new BuildException("Unsupported host platform {0}", HostPlatform);
++			}
++		}
++
++		private string GetBuildCommand(UEBuildTarget Target)
++		{
++			string Shell              = GetShellScriptExecutor();
++			string BuildScript        = GetBuildScriptLocation().FullName;
++			string ProjectFile        = Target.ProjectFile.FullName;
++			string TargetName         = Target.TargetName;
++			string Platform           = Target.Platform.ToString();
++			string Configuration      = Target.Configuration.ToString();
++			string ProjectCommandLine = $"-project=\"{ProjectFile}\"";
++
++			string Command = $"{Shell} \"{BuildScript}\" {TargetName} {Platform} {Configuration} {ProjectCommandLine}";
++
++			return Command;
++		}
++
++		private string GetRunCommand(UEBuildTarget Target, string BinaryFile)
++		{
++			if (Target.TargetType == TargetType.Editor)
++			{
++				string ProjectFile = Target.ProjectFile.FullName;
++				
++				return $"\"{BinaryFile}\" \"{ProjectFile}\"";
++			}
++
++			return $"\"{BinaryFile}\"";
++		}
 +
 +		#endregion
 +	}
@@ -345,10 +686,30 @@ index 00000000000..8d3d11f6fe9
 \ No newline at end of file
 diff --git a/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFolder.cs b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFolder.cs
 new file mode 100644
-index 00000000000..392943d7ca9
+index 00000000000..07df43d1223
 --- /dev/null
 +++ b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFolder.cs
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,38 @@
++// Copyright (c) 2021 Oleksandr Manenko
++//
++// Permission is  hereby granted, free  of charge,  to any person  obtaining a
++// copy of this software and  associated documentation files (the "Software"),
++// to deal in  the Software without restriction,  including without limitation
++// the rights  to use, copy,  modify, merge, publish,  distribute, sublicense,
++// and/or  sell copies  of the  Software, and  to permit  persons to  whom the
++// Software is furnished to do so, subject to the following conditions:
++//
++// The above copyright notice and this  permission notice shall be included in
++// all copies or substantial portions of the Software.
++//
++// THE SOFTWARE IS PROVIDED "AS IS",  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++// IMPLIED, INCLUDING  BUT NOT LIMITED  TO THE WARRANTIES  OF MERCHANTABILITY,
++// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++// AUTHORS OR  COPYRIGHT HOLDERS  BE LIABLE  FOR ANY  CLAIM, DAMAGES  OR OTHER
++// LIABILITY, WHETHER  IN AN  ACTION OF CONTRACT,  TORT OR  OTHERWISE, ARISING
++// FROM,  OUT OF  OR IN  CONNECTION  WITH THE  SOFTWARE  OR THE  USE OR  OTHER
++// DEALINGS IN THE SOFTWARE.
++
 +namespace UnrealBuildTool
 +{
 +	/// <summary>
@@ -421,6 +782,18 @@ index aec2d642e2b..b2c47d47e7e 100644
  		}
  	}
  }
+diff --git a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
+index 8497d6a7fde..5086bcf6fef 100644
+--- a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
++++ b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.cs
+@@ -411,6 +411,7 @@ namespace UnrealBuildTool
+ 			[CommandLine("-VSMac", Value="GenerateProjectFiles")]
+ 			[CommandLine("-CLion", Value="GenerateProjectFiles")]
+ 			[CommandLine("-Rider", Value="GenerateProjectFiles")]
++			[CommandLine("-UnrealEmacs", Value="GenerateProjectFiles")]
+ 			public string Mode = null;
+ 
+ 			/// <summary>
 diff --git a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj b/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
 index 2736ef225e2..ebc7964b579 100644
 --- a/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj
