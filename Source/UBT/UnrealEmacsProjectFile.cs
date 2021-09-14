@@ -19,6 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 using System.Collections.Generic;
+using System.Linq;
 using Tools.DotNETCommon;
 
 namespace UnrealBuildTool
@@ -34,7 +35,8 @@ namespace UnrealBuildTool
 		/// <param name="InProjectFilePath">
 		/// The path to the project file, relative to the master project file.
 		/// </param>
-		public UnrealEmacsProjectFile(FileReference InProjectFilePath) : base(InProjectFilePath)
+		public UnrealEmacsProjectFile(FileReference InProjectFilePath)
+			: base(InProjectFilePath)
 		{
 		}
 
@@ -49,8 +51,25 @@ namespace UnrealBuildTool
 			List<UnrealTargetConfiguration> InConfigurations,
 			PlatformProjectGeneratorCollection PlatformProjectGenerators)
 		{
-			// We do nothing at the moment, however there are plans to extend this.
 			return true;
+		}
+
+		private void WriteBinariesMetadata(JsonWriter Writer, IEnumerable<UEBuildBinary> Binaries)
+		{
+			Writer.WriteArrayStart("Binaries");
+			foreach (UEBuildBinary Binary in Binaries)
+			{
+				Writer.WriteObjectStart();
+
+				Writer.WriteStringArrayField("Files", Binary.OutputFilePaths.Select(FP => FP.FullName));
+				Writer.WriteValue("Type", Binary.Type.ToString());
+
+				// TODO: Write modules in the future?
+
+				Writer.WriteObjectEnd();
+			}
+
+			Writer.WriteArrayEnd();
 		}
 	}
 }
