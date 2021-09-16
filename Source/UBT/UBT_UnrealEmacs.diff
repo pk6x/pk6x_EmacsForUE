@@ -104,10 +104,10 @@ index 00000000000..71de6d7c447
 \ No newline at end of file
 diff --git a/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
 new file mode 100644
-index 00000000000..3d955f07763
+index 00000000000..1f486bc192b
 --- /dev/null
 +++ b/Engine/Source/Programs/UnrealBuildTool/ProjectFiles/Emacs/UnrealEmacsProjectFileGenerator.cs
-@@ -0,0 +1,607 @@
+@@ -0,0 +1,651 @@
 +// Copyright (c) 2021 Oleksandr Manenko
 +//
 +// Permission is  hereby granted, free  of charge,  to any person  obtaining a
@@ -533,7 +533,13 @@ index 00000000000..3d955f07763
 +			string SystemIncludeFormat = GetSystemIncludeFormatTemplate();
 +			string UserIncludeFormat   = GetUserIncludeFormatTemplate();
 +			string DefinitionFormat    = GetDefinitionFormatTemplate();
-+			
++
++			string CppStandard        = GetCppStandardCompilerSwitch(ModuleCompileEnvironment.CppStandard);
++			string SystemCompileFlags = GetSystemCompileFlags();
++
++			CompileCommand.AppendFormat(" {0}", CppStandard);
++			CompileCommand.AppendFormat(" {0}", SystemCompileFlags);
++
 +			foreach (FileItem File in ModuleCompileEnvironment.ForceIncludeFiles)
 +			{
 +				CompileCommand.AppendFormat(ForceIncludeFormat, File.FullName);
@@ -565,6 +571,44 @@ index 00000000000..3d955f07763
 +			{
 +				FileToCompileCommand[File.Location] = $"{CompileCommand} \"{File.FullName}\"";
 +			}
++		}
++
++		private string GetSystemCompileFlags()
++		{
++			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
++
++			if (HostPlatform == UnrealTargetPlatform.Mac)
++			{
++				return "-x objective-c++ -stdlib=libc++";
++			}
++
++			return "";
++		}
++
++		private string GetCppStandardCompilerSwitch(CppStandardVersion Version)
++		{
++			if (IsNonWindowsHost())
++			{
++				switch (Version)
++				{
++					case CppStandardVersion.Cpp14:   return "-std=c++14";
++					case CppStandardVersion.Cpp17:   return "-std=c++17";
++					case CppStandardVersion.Default: return "-std=c++17";
++					case CppStandardVersion.Latest:  return "-std=c++20";
++				}
++			}
++			else
++			{
++				switch (Version)
++				{
++					case CppStandardVersion.Cpp14:   return "/std:c++14";
++					case CppStandardVersion.Cpp17:   return "/std:c++17";
++					case CppStandardVersion.Default: return "/std:c++17";
++					case CppStandardVersion.Latest:  return "/std:c++latest";
++				}
++			}
++
++			return "";
 +		}
 +
 +		private string GetForceIncludeFormatTemplate()

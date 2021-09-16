@@ -423,7 +423,13 @@ namespace UnrealBuildTool
 			string SystemIncludeFormat = GetSystemIncludeFormatTemplate();
 			string UserIncludeFormat   = GetUserIncludeFormatTemplate();
 			string DefinitionFormat    = GetDefinitionFormatTemplate();
-			
+
+			string CppStandard        = GetCppStandardCompilerSwitch(ModuleCompileEnvironment.CppStandard);
+			string SystemCompileFlags = GetSystemCompileFlags();
+
+			CompileCommand.AppendFormat(" {0}", CppStandard);
+			CompileCommand.AppendFormat(" {0}", SystemCompileFlags);
+
 			foreach (FileItem File in ModuleCompileEnvironment.ForceIncludeFiles)
 			{
 				CompileCommand.AppendFormat(ForceIncludeFormat, File.FullName);
@@ -455,6 +461,44 @@ namespace UnrealBuildTool
 			{
 				FileToCompileCommand[File.Location] = $"{CompileCommand} \"{File.FullName}\"";
 			}
+		}
+
+		private string GetSystemCompileFlags()
+		{
+			UnrealTargetPlatform HostPlatform = BuildHostPlatform.Current.Platform;
+
+			if (HostPlatform == UnrealTargetPlatform.Mac)
+			{
+				return "-x objective-c++ -stdlib=libc++";
+			}
+
+			return "";
+		}
+
+		private string GetCppStandardCompilerSwitch(CppStandardVersion Version)
+		{
+			if (IsNonWindowsHost())
+			{
+				switch (Version)
+				{
+					case CppStandardVersion.Cpp14:   return "-std=c++14";
+					case CppStandardVersion.Cpp17:   return "-std=c++17";
+					case CppStandardVersion.Default: return "-std=c++17";
+					case CppStandardVersion.Latest:  return "-std=c++20";
+				}
+			}
+			else
+			{
+				switch (Version)
+				{
+					case CppStandardVersion.Cpp14:   return "/std:c++14";
+					case CppStandardVersion.Cpp17:   return "/std:c++17";
+					case CppStandardVersion.Default: return "/std:c++17";
+					case CppStandardVersion.Latest:  return "/std:c++latest";
+				}
+			}
+
+			return "";
 		}
 
 		private string GetForceIncludeFormatTemplate()
