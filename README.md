@@ -1,3 +1,5 @@
+This is a copy of the original one. Not my work
+
 # Emacs Source Code Accessor for Unreal Editor
 
 ## Synopsis
